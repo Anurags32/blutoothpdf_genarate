@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:slip_genrater/Api/api.dart';
+import 'package:slip_genrater/Screen/repot.dart';
 
 class TollPlazaForm extends StatefulWidget {
   @override
@@ -56,16 +59,41 @@ class _TollPlazaFormState extends State<TollPlazaForm> {
     super.dispose();
   }
 
+  Future<void> callPostApi() async {
+    final requestBody = {
+      "laneId": "LN002",
+      "tcName": _plazaNameController.text,
+      "dateTime": "${_dateController.text}${_timeController.text}",
+      "vehNum": _vehicleNoController.text,
+      "fare": "_feeController",
+      "penaltyFare": "_fineController",
+      "expiryDateTime": "2024-09-18T15:52:46.079Z"
+    };
+    String url = '${apiUrl}tolls';
+    ApiRequest apiRequest = ApiRequest(
+      url,
+      method: ApiMethod.POST, // Specify the HTTP method as POST
+      body: requestBody, // Pass the request body
+    );
+
+    try {
+      Response response = await apiRequest.send();
+      logger.i("API Response: ${response.data}");
+    } catch (e) {
+      logger.e("API call failed: $e");
+    }
+  }
+
   static String _getFormattedDate() {
     final now = DateTime.now();
     final formatter = DateFormat('dd/MM/yyyy');
-    return formatter.format(now);
+    return formatter.format(now).toString();
   }
 
   static String _getFormattedTime() {
     final now = DateTime.now();
     final formatter = DateFormat('hh:mm:ss a');
-    return formatter.format(now);
+    return formatter.format(now).toString();
   }
 
   void _initializeFields() {
@@ -161,13 +189,15 @@ class _TollPlazaFormState extends State<TollPlazaForm> {
         const SnackBar(content: Text('Printing...')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please connect to a Bluetooth printer.')),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   const SnackBar(content: Text('Please connect to a Bluetooth printer.')),
+      // );
+
       await Printing.sharePdf(
         bytes: await file.readAsBytes(),
         filename: 'toll_plaza_data.pdf',
       );
+      callPostApi();
     }
   }
 
@@ -243,6 +273,7 @@ class _TollPlazaFormState extends State<TollPlazaForm> {
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
                         _generatePDF();
+                        // callPostApi();
                       }
                     },
                     child: const Text(
@@ -250,6 +281,9 @@ class _TollPlazaFormState extends State<TollPlazaForm> {
                       style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
                   ),
+                ),
+                const SizedBox(
+                  height: 20,
                 ),
               ],
             ),
